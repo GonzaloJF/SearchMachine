@@ -1,0 +1,86 @@
+#!/bin/bash
+
+#Colours
+greenColour="\e[0;32m\033[1m"
+endColour="\033[0m\e[0m"
+redColour="\e[0;31m\033[1m"
+blueColour="\e[0;34m\033[1m"
+yellowColour="\e[0;33m\033[1m"
+purpleColour="\e[0;35m\033[1m"
+turquoiseColour="\e[0;36m\033[1m"
+grayColour="\e[0;37m\033[1m"
+
+#Variables globales: 
+
+main_url="https://htbmachines.github.io/bundle.js"
+
+function ctrl_c (){
+  echo -e "\n\n${redColour}[!]Saliendo.... ${endColour}\n"
+  tput cnorm &&  exit 1
+}
+
+#CRTL_C
+trap ctrl_c INT
+
+function helpPanel(){
+  echo -e "\n ${yellowColour}[+]${endColour} ${grayColour}Uso:${endColour}"
+  echo -e "\t ${purpleColour}m)${endColour} ${grayColour} Busca la maquina ${endColour}"
+  echo -e "\t ${purpleColour}u)${endColour} ${grayColour} Descarga o actualiza los datos de maquinas ${endColour}"
+  echo -e "\t ${purpleColour}h)${endColour} ${grayColour} Panel de ayuda ${endColour}"
+
+}
+
+function searchMachine(){
+  machineName="$1"
+
+  echo "$machineName"
+}
+
+function updateMachines(){
+  
+  if [ ! -f bundle.js ]; then
+    tput civis #oculta el cursor
+    echo -e "\t\n ${yellowColour}[+]${endColour} ${grayColour}Se estan descargando los archivos necesarios ${endColour}"
+    curl -s $main_url > bundle.js
+    js-beautify bundle.js | sponge bundle.js
+    echo -e "\t\n ${yellowColour}[+]${endColour} ${grayColour}Los archivos se descargaron correctamente${endColour}"
+    tput cnorm #devuelve el cursor a la normalidad
+  else
+    tput civis
+    echo -e "\n ${yellowColour}[+]${endColour}${grayColour}Buscando actualizaciones disponibles${endColour}"
+    curl -s $main_url > bundle_temp.js
+    js-beautify bundle_temp.js | sponge bundle_temp.js
+    md5file_temp_value=$(md5sum bundle_temp.js | awk '{print $1}')
+    md5file_original_value=$(md5sum bundle.js | awk '{print $1}')
+    
+    if [ "$md5file_temp_value" == "$md5file_original_value" ]; then
+      echo -e "\n ${yellowColour} [+]${endColour} ${grayColour}No se han detectado actualizaciones, esta todo al dia :D${endColour}"
+      rm bundle_temp.js
+    else
+      echo -e "\n ${yellowColour}[+]${endColour} ${grayColour}Aplicando nuevas actualizaciones, espera un momento porfavor${endColour}"
+      sleep 2
+      rm bundle.js && mv bundle_temp.js bundle.js 
+      echo -e "\n ${yellowColour}[+]${endColour} ${grayColour}Los archivos han sido correctamente actualizados${endColour}"
+    fi
+
+    tput cnorm
+  fi  
+}
+
+declare -i parameter_counter=0
+
+while getopts "m:uh" arg; do
+  case $arg in
+    m) machineName=$OTPARG; let parameter_counter+=1;;
+    u) let parameter_counter+=2;;
+    h) ;;
+  esac
+done
+ 
+if [ $parameter_counter -eq 1 ]; then
+  searchMachine $machineName
+elif [ $parameter_counter -eq 2 ]; then
+  updateMachines
+else
+  helpPanel
+fi
