@@ -1,86 +1,79 @@
 #!/bin/bash
 
-#Colours
-greenColour="\e[0;32m\033[1m"
-endColour="\033[0m\e[0m"
-redColour="\e[0;31m\033[1m"
-blueColour="\e[0;34m\033[1m"
-yellowColour="\e[0;33m\033[1m"
-purpleColour="\e[0;35m\033[1m"
-turquoiseColour="\e[0;36m\033[1m"
-grayColour="\e[0;37m\033[1m"
-
-#Variables globales: 
-
+#VARIABLES GLOBALES
 main_url="https://htbmachines.github.io/bundle.js"
-
+#FUNCTIONS
 function ctrl_c (){
-  echo -e "\n\n${redColour}[!]Saliendo.... ${endColour}\n"
-  tput cnorm &&  exit 1
+  echo -e "\n\n [!] Saliendo... \n"
+  tput cnorm && exit 1
 }
 
-#CRTL_C
-trap ctrl_c INT
-
 function helpPanel(){
-  echo -e "\n ${yellowColour}[+]${endColour} ${grayColour}Uso:${endColour}"
-  echo -e "\t ${purpleColour}m)${endColour} ${grayColour} Busca la maquina ${endColour}"
-  echo -e "\t ${purpleColour}u)${endColour} ${grayColour} Descarga o actualiza los datos de maquinas ${endColour}"
-  echo -e "\t ${purpleColour}h)${endColour} ${grayColour} Panel de ayuda ${endColour}"
+  echo -e "${yellowColour}[+]${endColour}${grayColour}Uso:${endColour}"
+  echo -e "${purpleColour}u)${endColour}${grayColour}Descargar o Actualizar las Maquinas${endColour}"
+  echo -e "${purpleColour}m)${endColour}${grayColour}Buscar por nombre de la maquina${endColour}"
+  echo -e "${purpleColour}h)${endColour}${grayColour}Panel de ayuda${endColour}"
+  echo -e "${purpleColour}i)${endColour}${grayColour}Busqueda por IP${endColour}"
+} 
 
+function updateFiles(){
+  tput civis
+  if  [ ! -f bundle.js ]; then
+    echo -e "\n ${yellowColour}[+]${endColour}${grayColour} Descargando los archivos necesarios: ${endColour}"
+    curl -s $main_url > bundle.js
+    js-beautify bundle.js | sponge bundle.js
+    echo -e "\n ${yellowColour}[+]${endColour} ${grayColour}Datos Descargados correctamentes${endColour} \n"
+  else
+    echo -e "\n${yellowColour}[+]${endColour} ${grayColour}Comprobando si hay actualizaciones pendientes${endColour}"
+    curl -s $main_url > bundle_temp.js
+    js-beautify bundle_temp.js | sponge bundle_temp.js
+    md5_tempfile_value=$(md5sum bundle_temp.js | awk '{print 1}')
+    md5_original_value=$(md5sum bundle.js | awk '{print 1}' )
+    if [ $md5_tempfile_value == $md5_original_value ]; then
+       echo -e "\n ${yellowColour}[+]${endColour}${grayColour} No hay actualizaciones disponibles${endColour}"
+       rm -r bundle_temp.js
+    else
+       echo -e "\n ${yellowColour}[+]${endColour}${grayColour} Se han encontrado actualizaciones disponibles${endColour}"
+       sleep 2 
+       rm bundle.js && mv bundle_temp.js bundle.js
+       echo -e "\n ${yellowColour}[+]${endColour}${grayColour} Los archivos se han actualizado correctamente${endColour}"
+    fi
+  fi
+  tput cnorm
 }
 
 function searchMachine(){
   machineName="$1"
-
-  echo "$machineName"
-}
-
-function updateMachines(){
   
-  if [ ! -f bundle.js ]; then
-    tput civis #oculta el cursor
-    echo -e "\t\n ${yellowColour}[+]${endColour} ${grayColour}Se estan descargando los archivos necesarios ${endColour}"
-    curl -s $main_url > bundle.js
-    js-beautify bundle.js | sponge bundle.js
-    echo -e "\t\n ${yellowColour}[+]${endColour} ${grayColour}Los archivos se descargaron correctamente${endColour}"
-    tput cnorm #devuelve el cursor a la normalidad
-  else
-    tput civis
-    echo -e "\n ${yellowColour}[+]${endColour}${grayColour}Buscando actualizaciones disponibles${endColour}"
-    curl -s $main_url > bundle_temp.js
-    js-beautify bundle_temp.js | sponge bundle_temp.js
-    md5file_temp_value=$(md5sum bundle_temp.js | awk '{print $1}')
-    md5file_original_value=$(md5sum bundle.js | awk '{print $1}')
-    
-    if [ "$md5file_temp_value" == "$md5file_original_value" ]; then
-      echo -e "\n ${yellowColour} [+]${endColour} ${grayColour}No se han detectado actualizaciones, esta todo al dia :D${endColour}"
-      rm bundle_temp.js
-    else
-      echo -e "\n ${yellowColour}[+]${endColour} ${grayColour}Aplicando nuevas actualizaciones, espera un momento porfavor${endColour}"
-      sleep 2
-      rm bundle.js && mv bundle_temp.js bundle.js 
-      echo -e "\n ${yellowColour}[+]${endColour} ${grayColour}Los archivos han sido correctamente actualizados${endColour}"
-    fi
-
-    tput cnorm
-  fi  
+  echo -e "\n ${yellowColour}[+]${endColour}${grayColour} Listando las propiedades de las maquinas${endColour} ${blueColour} $machineName${endColour}${grayColour}:${endColour}"
+  cat bundle.js | awk "/name: \"Tentacle\"/,/resuelta: /" | grep -vE "id|sku|resuelta" | tr -d '"' | tr -d ',' | sed 's/^ *//'
 }
 
+function searchIp(){
+  echo -e "\n[+] Buscando maquina segun la IP : $machine_Ip"
+}
+
+#CRTL+C 
+trap ctrl_c INT
+
+#INDICADORES
 declare -i parameter_counter=0
 
 while getopts "m:uh" arg; do
-  case $arg in
-    m) machineName=$OTPARG; let parameter_counter+=1;;
-    u) let parameter_counter+=2;;
+  case
+    m) machineName=$OPTARG; let parameter_counter+=1;;
     h) ;;
-  esac
+    u) let parameter_counter+=2;;
+    i) machine_Ip=$OPTARG; let parameter_counter+=3;;
+  esac  
 done
- 
+
 if [ $parameter_counter -eq 1 ]; then
   searchMachine $machineName
 elif [ $parameter_counter -eq 2 ]; then
-  updateMachines
-else
+  updateFiles
+elif [ $parameter_counter -eq 3 ]; then
+  searchIp  $machine_Ip
+else  
   helpPanel
 fi
